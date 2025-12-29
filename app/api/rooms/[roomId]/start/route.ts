@@ -71,6 +71,7 @@ export async function POST(
       phase: 'revealing',
     });
 
+    const pusher = pusherServer;
     setTimeout(async () => {
       const playerIds = Object.keys(room.players);
       if (playerIds.length > 0) {
@@ -79,10 +80,12 @@ export async function POST(
 
       roomManager.updateRoomPhase(roomId, 'giving-clues');
 
-      await pusherServer.trigger(`presence-room-${roomId}`, 'phase-changed', {
-        phase: 'giving-clues',
-        currentTurnPlayerId: room.currentTurnPlayerId,
-      });
+      if (pusher) {
+        await pusher.trigger(`presence-room-${roomId}`, 'phase-changed', {
+          phase: 'giving-clues',
+          currentTurnPlayerId: room.currentTurnPlayerId,
+        });
+      }
     }, 5000);
 
     const updatedRoom = roomManager.getRoom(roomId);
