@@ -1,0 +1,28 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { pusherServer } from '@/lib/pusher/server';
+
+export async function POST(request: NextRequest) {
+  try {
+    const data = await request.text();
+    const params = new URLSearchParams(data);
+    const socketId = params.get('socket_id');
+    const channel = params.get('channel_name');
+
+    if (!socketId || !channel) {
+      return NextResponse.json(
+        { error: 'Missing socket_id or channel_name' },
+        { status: 400 }
+      );
+    }
+
+    const authResponse = pusherServer.authorizeChannel(socketId, channel);
+
+    return NextResponse.json(authResponse);
+  } catch (error) {
+    console.error('Pusher auth error:', error);
+    return NextResponse.json(
+      { error: 'Authentication failed' },
+      { status: 500 }
+    );
+  }
+}
