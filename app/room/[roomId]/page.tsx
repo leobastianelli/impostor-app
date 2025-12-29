@@ -18,6 +18,8 @@ import { ResultsScreen } from '@/components/game/ResultsScreen';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
 
+
+
 interface GameRoomPageProps {
   params: Promise<{ roomId: string }>;
 }
@@ -98,7 +100,10 @@ useEffect(() => {
       });
     });
 
-    channel.bind('clue-submitted', (data: { clue: unknown; currentTurnPlayerId?: string }) => {
+    channel.bind(
+  'clue-submitted',
+  (data: { clue: Room['clues'][number]; currentTurnPlayerId?: string }) => {
+
       setRoom((prevRoom) => {
         if (!prevRoom) return null;
         return {
@@ -113,9 +118,14 @@ useEffect(() => {
       setRoom((prevRoom) => prevRoom);
     });
 
-    channel.bind(
-      'game-ended',
-      (data: { phase: string; winner: string; votes: unknown[] }) => {
+channel.bind(
+  'game-ended',
+  (data: {
+    phase: Room['phase'];
+    winner: Room['winner'];
+    votes: Room['votes'];
+  }) => {
+
         setRoom((prevRoom) => {
           if (!prevRoom) return null;
           return {
