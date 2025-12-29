@@ -48,12 +48,12 @@ useEffect(() => {
     return;
   }
 
-  const client = pusherClient; // referencia segura (no-null)
+  const client = pusherClient;
 
   const presenceChannelName = `presence-room-${roomId}`;
   const privateChannelName = `private-player-${playerId}`;
 
-  // evitar subscripciones duplicadas (Strict Mode / remounts)
+  // Evitar subscripciones duplicadas (Strict Mode / remounts)
   client.unsubscribe(presenceChannelName);
   client.unsubscribe(privateChannelName);
 
@@ -98,7 +98,7 @@ useEffect(() => {
       });
     });
 
-    channel.bind('clue-submitted', (data: { clue: any; currentTurnPlayerId?: string }) => {
+    channel.bind('clue-submitted', (data: { clue: unknown; currentTurnPlayerId?: string }) => {
       setRoom((prevRoom) => {
         if (!prevRoom) return null;
         return {
@@ -113,23 +113,25 @@ useEffect(() => {
       setRoom((prevRoom) => prevRoom);
     });
 
-    channel.bind('game-ended', (data: { phase: string; winner: string; votes: any[] }) => {
-      setRoom((prevRoom) => {
-        if (!prevRoom) return null;
-        return {
-          ...prevRoom,
-          phase: data.phase as Room['phase'],
-          winner: data.winner as Room['winner'],
-          votes: data.votes,
-        };
-      });
-    });
+    channel.bind(
+      'game-ended',
+      (data: { phase: string; winner: string; votes: unknown[] }) => {
+        setRoom((prevRoom) => {
+          if (!prevRoom) return null;
+          return {
+            ...prevRoom,
+            phase: data.phase as Room['phase'],
+            winner: data.winner as Room['winner'],
+            votes: data.votes,
+          };
+        });
+      }
+    );
 
-    // 👇 recién acá la app está lista
     setLoading(false);
   });
 
-  channel.bind('pusher:subscription_error', (err) => {
+  channel.bind('pusher:subscription_error', (err: unknown) => {
     console.error('Presence subscription error', err);
     setLoading(false);
   });
@@ -137,13 +139,16 @@ useEffect(() => {
   const privateChannel = client.subscribe(privateChannelName);
 
   privateChannel.bind('pusher:subscription_succeeded', () => {
-    privateChannel.bind('character-assigned', (data: { character: Character; role: PlayerRole }) => {
-      setAssignedCharacter(data.character);
-      setRole(data.role);
-    });
+    privateChannel.bind(
+      'character-assigned',
+      (data: { character: Character; role: PlayerRole }) => {
+        setAssignedCharacter(data.character);
+        setRole(data.role);
+      }
+    );
   });
 
-  privateChannel.bind('pusher:subscription_error', (err) => {
+  privateChannel.bind('pusher:subscription_error', (err: unknown) => {
     console.error('Private channel subscription error', err);
   });
 
