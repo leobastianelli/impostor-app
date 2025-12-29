@@ -43,6 +43,11 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
       return;
     }
 
+    if (!pusherClient) {
+      setLoading(false);
+      return;
+    }
+
     const channel = pusherClient.subscribe(`presence-room-${roomId}`);
 
     channel.bind('player-joined', (data: { player: Player }) => {

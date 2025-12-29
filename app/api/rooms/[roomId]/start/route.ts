@@ -8,6 +8,13 @@ export async function POST(
   { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
+    if (!pusherServer) {
+      return NextResponse.json(
+        { error: 'Pusher not configured. Please set environment variables.' },
+        { status: 503 }
+      );
+    }
+
     const { roomId } = await params;
     const { playerId } = await request.json();
 

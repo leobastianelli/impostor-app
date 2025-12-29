@@ -5,6 +5,13 @@ import { pusherServer } from '@/lib/pusher/server';
 
 export async function POST(request: NextRequest) {
   try {
+    if (!pusherServer) {
+      return NextResponse.json(
+        { error: 'Pusher not configured. Please set environment variables.' },
+        { status: 503 }
+      );
+    }
+
     const { code, playerName } = await request.json();
 
     if (!code || !playerName) {

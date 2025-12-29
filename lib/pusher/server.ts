@@ -1,9 +1,22 @@
 import Pusher from 'pusher';
 
-export const pusherServer = new Pusher({
-  appId: process.env.PUSHER_APP_ID!,
-  key: process.env.NEXT_PUBLIC_PUSHER_KEY!,
-  secret: process.env.PUSHER_SECRET!,
-  cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-  useTLS: true,
-});
+let pusherServer: Pusher | null = null;
+
+const pusherAppId = process.env.PUSHER_APP_ID;
+const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY;
+const pusherSecret = process.env.PUSHER_SECRET;
+const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
+
+if (pusherAppId && pusherKey && pusherSecret && pusherCluster) {
+  pusherServer = new Pusher({
+    appId: pusherAppId,
+    key: pusherKey,
+    secret: pusherSecret,
+    cluster: pusherCluster,
+    useTLS: true,
+  });
+} else {
+  console.warn('Pusher server configuration missing. Please set all required environment variables.');
+}
+
+export { pusherServer };
