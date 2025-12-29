@@ -48,11 +48,16 @@ useEffect(() => {
     return;
   }
 
-  // 🔒 Aseguramos no duplicar subscripciones
-  pusherClient.unsubscribe(`presence-room-${roomId}`);
-  pusherClient.unsubscribe(`private-player-${playerId}`);
+  const client = pusherClient; // referencia segura (no-null)
 
-  const channel = pusherClient.subscribe(`presence-room-${roomId}`);
+  const presenceChannelName = `presence-room-${roomId}`;
+  const privateChannelName = `private-player-${playerId}`;
+
+  // evitar subscripciones duplicadas (Strict Mode / remounts)
+  client.unsubscribe(presenceChannelName);
+  client.unsubscribe(privateChannelName);
+
+  const channel = client.subscribe(presenceChannelName);
 
   channel.bind('pusher:subscription_succeeded', () => {
     console.log('Presence channel ready');
@@ -119,9 +124,17 @@ useEffect(() => {
         };
       });
     });
+
+    // 👇 recién acá la app está lista
+    setLoading(false);
   });
 
-  const privateChannel = pusherClient.subscribe(`private-player-${playerId}`);
+  channel.bind('pusher:subscription_error', (err) => {
+    console.error('Presence subscription error', err);
+    setLoading(false);
+  });
+
+  const privateChannel = client.subscribe(privateChannelName);
 
   privateChannel.bind('pusher:subscription_succeeded', () => {
     privateChannel.bind('character-assigned', (data: { character: Character; role: PlayerRole }) => {
@@ -130,14 +143,16 @@ useEffect(() => {
     });
   });
 
-  setLoading(false);
+  privateChannel.bind('pusher:subscription_error', (err) => {
+    console.error('Private channel subscription error', err);
+  });
 
   return () => {
     channel.unbind_all();
-    pusherClient.unsubscribe(`presence-room-${roomId}`);
+    client.unsubscribe(presenceChannelName);
 
     privateChannel.unbind_all();
-    pusherClient.unsubscribe(`private-player-${playerId}`);
+    client.unsubscribe(privateChannelName);
   };
 }, [roomId, router]);
 
