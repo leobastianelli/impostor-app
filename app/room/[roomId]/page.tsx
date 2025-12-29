@@ -35,20 +35,27 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
   const [isSubmittingClue, setIsSubmittingClue] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
 
-  useEffect(() => {
-    const playerId = localStorage.getItem('playerId');
+useEffect(() => {
+  const playerId = localStorage.getItem('playerId');
 
-    if (!playerId) {
-      router.push('/');
-      return;
-    }
+  if (!playerId) {
+    router.push('/');
+    return;
+  }
 
-    if (!pusherClient) {
-      setLoading(false);
-      return;
-    }
+  if (!pusherClient) {
+    setLoading(false);
+    return;
+  }
 
-    const channel = pusherClient.subscribe(`presence-room-${roomId}`);
+  // 🔒 Aseguramos no duplicar subscripciones
+  pusherClient.unsubscribe(`presence-room-${roomId}`);
+  pusherClient.unsubscribe(`private-player-${playerId}`);
+
+  const channel = pusherClient.subscribe(`presence-room-${roomId}`);
+
+  channel.bind('pusher:subscription_succeeded', () => {
+    console.log('Presence channel ready');
 
     channel.bind('player-joined', (data: { player: Player }) => {
       setRoom((prevRoom) => {
@@ -98,10 +105,7 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
     });
 
     channel.bind('vote-submitted', () => {
-      setRoom((prevRoom) => {
-        if (!prevRoom) return null;
-        return { ...prevRoom };
-      });
+      setRoom((prevRoom) => prevRoom);
     });
 
     channel.bind('game-ended', (data: { phase: string; winner: string; votes: any[] }) => {
@@ -115,23 +119,28 @@ export default function GameRoomPage({ params }: GameRoomPageProps) {
         };
       });
     });
+  });
 
-    const privateChannel = pusherClient.subscribe(`private-player-${playerId}`);
+  const privateChannel = pusherClient.subscribe(`private-player-${playerId}`);
 
+  privateChannel.bind('pusher:subscription_succeeded', () => {
     privateChannel.bind('character-assigned', (data: { character: Character; role: PlayerRole }) => {
       setAssignedCharacter(data.character);
       setRole(data.role);
     });
+  });
 
-    setLoading(false);
+  setLoading(false);
 
-    return () => {
-      channel.unbind_all();
-      channel.unsubscribe();
-      privateChannel.unbind_all();
-      privateChannel.unsubscribe();
-    };
-  }, [roomId, router]);
+  return () => {
+    channel.unbind_all();
+    pusherClient.unsubscribe(`presence-room-${roomId}`);
+
+    privateChannel.unbind_all();
+    pusherClient.unsubscribe(`private-player-${playerId}`);
+  };
+}, [roomId, router]);
+
 
   useEffect(() => {
     const playerId = localStorage.getItem('playerId');
