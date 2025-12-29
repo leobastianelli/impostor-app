@@ -46,7 +46,7 @@ useEffect(() => {
   }
 
   if (!pusherClient) {
-    setLoading(false);
+    console.error('Pusher client not available');
     return;
   }
 
@@ -55,113 +55,138 @@ useEffect(() => {
   const presenceChannelName = `presence-room-${roomId}`;
   const privateChannelName = `private-player-${playerId}`;
 
-  // Evitar subscripciones duplicadas (Strict Mode / remounts)
+  // =========================
+  // 1️⃣ FETCH INICIAL DE ROOM
+  // =========================
+  (async () => {
+    try {
+      const res = await fetch(`/api/rooms/${roomId}`);
+      if (!res.ok) throw new Error('Failed to fetch room');
+
+      const data = await res.json();
+      setRoom(data.room);
+    } catch (err) {
+      console.error('Error fetching room:', err);
+    }
+  })();
+
+  // =========================
+  // 2️⃣ PUSHER – CLEAN PREV
+  // =========================
   client.unsubscribe(presenceChannelName);
   client.unsubscribe(privateChannelName);
 
+  // =========================
+  // 3️⃣ PRESENCE CHANNEL
+  // =========================
   const channel = client.subscribe(presenceChannelName);
 
   channel.bind('pusher:subscription_succeeded', () => {
     console.log('Presence channel ready');
+  });
 
-    channel.bind('player-joined', (data: { player: Player }) => {
+  channel.bind('pusher:subscription_error', (err: unknown) => {
+    console.error('Presence subscription error', err);
+  });
+
+  channel.bind('player-joined', (data: { player: Player }) => {
+    setRoom((prevRoom) => {
+      if (!prevRoom) return null;
+      return {
+        ...prevRoom,
+        players: {
+          ...prevRoom.players,
+          [data.player.id]: data.player,
+        },
+      };
+    });
+  });
+
+  channel.bind('player-left', (data: { playerId: string }) => {
+    setRoom((prevRoom) => {
+      if (!prevRoom) return null;
+      const players = { ...prevRoom.players };
+      delete players[data.playerId];
+      return { ...prevRoom, players };
+    });
+  });
+
+  channel.bind(
+    'phase-changed',
+    (data: { phase: Room['phase']; currentTurnPlayerId?: string }) => {
       setRoom((prevRoom) => {
         if (!prevRoom) return null;
         return {
           ...prevRoom,
-          players: {
-            ...prevRoom.players,
-            [data.player.id]: data.player,
-          },
+          phase: data.phase,
+          currentTurnPlayerId:
+            data.currentTurnPlayerId ?? prevRoom.currentTurnPlayerId,
         };
       });
-    });
+    }
+  );
 
-    channel.bind('player-left', (data: { playerId: string }) => {
-      setRoom((prevRoom) => {
-        if (!prevRoom) return null;
-        const newPlayers = { ...prevRoom.players };
-        delete newPlayers[data.playerId];
-        return {
-          ...prevRoom,
-          players: newPlayers,
-        };
-      });
-    });
-
-    channel.bind('phase-changed', (data: { phase: string; currentTurnPlayerId?: string }) => {
-      setRoom((prevRoom) => {
-        if (!prevRoom) return null;
-        return {
-          ...prevRoom,
-          phase: data.phase as Room['phase'],
-          currentTurnPlayerId: data.currentTurnPlayerId || prevRoom.currentTurnPlayerId,
-        };
-      });
-    });
-
-    channel.bind(
-  'clue-submitted',
-  (data: { clue: Room['clues'][number]; currentTurnPlayerId?: string }) => {
-
+  channel.bind(
+    'clue-submitted',
+    (data: {
+      clue: Room['clues'][number];
+      currentTurnPlayerId?: string;
+    }) => {
       setRoom((prevRoom) => {
         if (!prevRoom) return null;
         return {
           ...prevRoom,
           clues: [...prevRoom.clues, data.clue],
-          currentTurnPlayerId: data.currentTurnPlayerId || prevRoom.currentTurnPlayerId,
+          currentTurnPlayerId:
+            data.currentTurnPlayerId ?? prevRoom.currentTurnPlayerId,
         };
       });
-    });
+    }
+  );
 
-    channel.bind('vote-submitted', () => {
-      setRoom((prevRoom) => prevRoom);
-    });
+  channel.bind(
+    'game-ended',
+    (data: {
+      phase: Room['phase'];
+      winner: Room['winner'];
+      votes: Room['votes'];
+    }) => {
+      setRoom((prevRoom) => {
+        if (!prevRoom) return null;
+        return {
+          ...prevRoom,
+          phase: data.phase,
+          winner: data.winner,
+          votes: data.votes,
+        };
+      });
+    }
+  );
 
-channel.bind(
-  'game-ended',
-  (data: {
-    phase: Room['phase'];
-    winner: Room['winner'];
-    votes: Room['votes'];
-  }) => {
-
-        setRoom((prevRoom) => {
-          if (!prevRoom) return null;
-          return {
-            ...prevRoom,
-            phase: data.phase as Room['phase'],
-            winner: data.winner as Room['winner'],
-            votes: data.votes,
-          };
-        });
-      }
-    );
-
-    setLoading(false);
-  });
-
-  channel.bind('pusher:subscription_error', (err: unknown) => {
-    console.error('Presence subscription error', err);
-    setLoading(false);
-  });
-
+  // =========================
+  // 4️⃣ PRIVATE CHANNEL
+  // =========================
   const privateChannel = client.subscribe(privateChannelName);
 
   privateChannel.bind('pusher:subscription_succeeded', () => {
-    privateChannel.bind(
-      'character-assigned',
-      (data: { character: Character; role: PlayerRole }) => {
-        setAssignedCharacter(data.character);
-        setRole(data.role);
-      }
-    );
+    console.log('Private channel ready');
   });
+
+  privateChannel.bind(
+    'character-assigned',
+    (data: { character: Character; role: PlayerRole }) => {
+      setAssignedCharacter(data.character);
+      setRole(data.role);
+    }
+  );
 
   privateChannel.bind('pusher:subscription_error', (err: unknown) => {
-    console.error('Private channel subscription error', err);
+    console.error('Private subscription error', err);
   });
 
+  // =========================
+  // 5️⃣ CLEANUP
+  // =========================
   return () => {
     channel.unbind_all();
     client.unsubscribe(presenceChannelName);
@@ -170,6 +195,7 @@ channel.bind(
     client.unsubscribe(privateChannelName);
   };
 }, [roomId, router]);
+
 
 
   useEffect(() => {
