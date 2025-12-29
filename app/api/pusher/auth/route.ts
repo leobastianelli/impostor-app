@@ -22,7 +22,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const authResponse = pusherServer.authorizeChannel(socketId, channel);
+    let authResponse;
+
+if (channel.startsWith('presence-')) {
+  // ⚠️ Presence requiere channel_data
+  const presenceData = {
+    user_id: socketId, // mínimo válido (mejor que nada)
+    user_info: {},
+  };
+
+  authResponse = pusherServer.authorizeChannel(
+    socketId,
+    channel,
+    presenceData
+  );
+} else {
+  // private channels
+  authResponse = pusherServer.authorizeChannel(socketId, channel);
+}
+
+return NextResponse.json(authResponse);
+
 
     return NextResponse.json(authResponse);
   } catch (error) {
